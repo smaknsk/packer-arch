@@ -2,8 +2,9 @@
 
 DISK='/dev/sda'
 FQDN='vagrant-arch.vagrantup.com'
-KEYMAP='us'
+KEYMAP='cyr-sun16'
 LANGUAGE='en_US.UTF-8'
+LANGUAGE2='ru_RU.UTF-8'
 PASSWORD=$(/usr/bin/openssl passwd -crypt 'vagrant')
 TIMEZONE='UTC'
 
@@ -30,6 +31,10 @@ echo '==> creating /root filesystem (ext4)'
 echo "==> mounting ${ROOT_PARTITION} to ${TARGET_DIR}"
 /usr/bin/mount -o noatime,errors=remount-ro ${ROOT_PARTITION} ${TARGET_DIR}
 
+echo '==> selecting mirrors'
+/usr/bin/curl -o /etc/pacman.d/mirrorlist 'https://www.archlinux.org/mirrorlist/?country=RU&use_mirror_status=on'
+/usr/bin/sed -i 's/^#Server/Server/g' /etc/pacman.d/mirrorlist
+
 echo '==> bootstrapping the base installation'
 /usr/bin/pacstrap ${TARGET_DIR} base base-devel
 /usr/bin/arch-chroot ${TARGET_DIR} pacman -S --noconfirm gptfdisk openssh syslinux
@@ -48,6 +53,7 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 	/usr/bin/ln -s /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
 	echo 'KEYMAP=${KEYMAP}' > /etc/vconsole.conf
 	/usr/bin/sed -i 's/#${LANGUAGE}/${LANGUAGE}/' /etc/locale.gen
+	/usr/bin/sed -i 's/#${LANGUAGE2}/${LANGUAGE2}/' /etc/locale.gen
 	/usr/bin/locale-gen
 	/usr/bin/mkinitcpio -p linux
 	/usr/bin/usermod --password ${PASSWORD} root
@@ -76,13 +82,34 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 	/usr/bin/curl --output /home/vagrant/.ssh/authorized_keys --location https://raw.github.com/mitchellh/vagrant/master/keys/vagrant.pub
 	/usr/bin/chown vagrant:users /home/vagrant/.ssh/authorized_keys
 	/usr/bin/chmod 0600 /home/vagrant/.ssh/authorized_keys
+
+	# Add nfs
 	/usr/bin/pacman -S --noconfirm nfs-utils
 	/usr/bin/systemctl enable rpcbind
-	curl https://aur.archlinux.org/packages/bi/bindfs/bindfs.tar.gz | tar -zx
-	cd bindfs
-	makepkg -si --noconfirm --asroot
-	cd ../
-	rm -r bindfs
+	
+	# Add bindfs
+	function aurinstall() {
+	    # Check is root
+	    if [ $EUID -ne 0 ]; then
+	        echo "You must run as root user" 2>&1
+	        return 1
+	    fi
+	    local PKGNAME
+	    for PKGNAME in $@; do
+	        echo "Installing ${PKGNAME}..."
+	        local PKGDEST=/tmp/makepkg_${PKGNAME}
+	        /usr/bin/mkdir ${PKGDEST}
+	        cd ${PKGDEST}
+	        /usr/bin/curl -s https://aur.archlinux.org/packages/${PKGNAME:0:2}/${PKGNAME}/${PKGNAME}.tar.gz | /usr/bin/tar -zx
+	        cd ${PKGNAME}
+	        /usr/bin/chown nobody:nobody -R ${PKGDEST}
+	        /usr/bin/sudo -u nobody /usr/bin/makepkg -s --noconfirm PKGDEST=${PKGDEST} &>/dev/null
+	        /usr/bin/pacman -U --needed --noconfirm `/usr/bin/find ${PKGDEST}/*pkg.tar.xz`
+	        rm -r ${PKGDEST}
+	    done
+	}
+	/usr/bin/pacman -S --noconfirm fuse
+	aurinstall bindfs
 	
 	# clean up
 	/usr/bin/pacman -Rcns --noconfirm gptfdisk
