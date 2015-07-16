@@ -103,8 +103,8 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 	        /usr/bin/curl -s https://aur.archlinux.org/packages/${PKGNAME:0:2}/${PKGNAME}/${PKGNAME}.tar.gz | /usr/bin/tar -zx
 	        cd ${PKGNAME}
 	        /usr/bin/chown nobody:nobody -R ${PKGDEST}
-	        /usr/bin/sudo -u nobody /usr/bin/makepkg -s --noconfirm PKGDEST=${PKGDEST} &>/dev/null
-	        /usr/bin/pacman -U --needed --noconfirm `/usr/bin/find ${PKGDEST}/*pkg.tar.xz`
+	        /usr/bin/sudo -u nobody /usr/bin/sh -c "/usr/bin/makepkg -s --noconfirm PKGDEST=${PKGDEST}" &>/dev/null
+	        /usr/bin/pacman -U --needed --noconfirm `/usr/bin/find ${PKGDEST}/${PKGNAME}/*pkg.tar.xz`
 	        rm -r ${PKGDEST}
 	    done
 	}
