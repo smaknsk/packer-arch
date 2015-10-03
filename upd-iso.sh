@@ -50,7 +50,10 @@ template='arch-template.json'
 function setTamplateValue {
     sed -e '1,/"'${1}'": "\(.*\)"/s|"'${1}'": "\(.*\)"|"'${1}'": "'${2}'"|' ${template} > ${template}.bk && mv ${template}.bk ${template}
 }
-setTamplateValue 'iso_url' ${repo}${iso[1]}
-setTamplateValue 'iso_checksum' ${iso[0]}
+#setTamplateValue 'iso_url' ${repo}${iso[1]}
+#setTamplateValue 'iso_checksum' ${iso[0]}
 
 echo 'Update successfully: '${repo}${iso[1]}
+
+echo "packer build -only=virtualbox-iso -var 'iso_url=${repo}${iso[1]}' -var 'iso_checksum=${iso[0]}' arch-template.json"
+#sh -c "packer build -only=virtualbox-iso -var 'iso_url=${repo}${iso[1]}' -var 'iso_checksum=${iso[0]}' arch-template.json"
